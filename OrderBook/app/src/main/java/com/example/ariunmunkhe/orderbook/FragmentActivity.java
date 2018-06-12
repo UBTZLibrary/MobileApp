@@ -27,7 +27,7 @@ public class FragmentActivity extends AppCompatActivity
     public static String _Password = "";
 
     public static String NAMESPACE = "http://tempuri.org/";
-    public static String URL = "http://172.16.236.196/UBTZ/WebService.asmx";
+    public static String URL = "http://ubtzlibrary.com/WebService.asmx";
     public static SQLiteDatabase db;
 
     @Override
@@ -90,7 +90,7 @@ public class FragmentActivity extends AppCompatActivity
             db = openOrCreateDatabase("appDB", Context.MODE_PRIVATE, null);
             db.execSQL("CREATE TABLE IF NOT EXISTS tblsetting(entryID VARCHAR,namespace VARCHAR, url VARCHAR);");
             db.execSQL("INSERT INTO tblsetting(entryID,namespace, url) \n" +
-                    "SELECT '1', 'http://tempuri.org/', 'http://172.16.236.196:8081/WebService.asmx' \n" +
+                    "SELECT '1', 'http://tempuri.org/', 'http://ubtzlibrary.com/WebService.asmx' \n" +
                     "WHERE NOT EXISTS(SELECT 1 FROM tblsetting WHERE entryID = '1');");
             db.execSQL("create table if not exists TBLUSER(\n" +
                     "  userid     NVARCHAR2(100) not null,\n" +
