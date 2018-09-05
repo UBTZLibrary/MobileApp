@@ -24,7 +24,14 @@ public class BookListDTL {
     private String IPAddress;
     private String MACAddress;
     private Bitmap BookImage;
-    private String isOrder;
+    private long isOrder;
+    private int Status;
+    private boolean favorites;
+    private String OrderDate;
+    private String GiveDate;
+    private String TakeDate;
+    private String ReturnDate;
+    private String ReturnedDate;
 
     public BookListDTL() {
     }
@@ -46,7 +53,7 @@ public class BookListDTL {
                        String IPAddress,
                        String MACAddress,
                        Bitmap BookImage,
-                       String isOrder) {
+                       long isOrder) {
         this.BookID = BookID;
         this.Code = Code;
         this.Name = Name;
@@ -65,6 +72,7 @@ public class BookListDTL {
         this.MACAddress = MACAddress;
         this.BookImage = BookImage;
         this.isOrder = isOrder;
+        favorites = false;
     }
 
     public long getBookID() {
@@ -136,7 +144,56 @@ public class BookListDTL {
     }
 
     public String getIsOrder() {
-        return this.isOrder;
+
+        String retValue;
+        if (isOrder > 0)
+            retValue = "Y";
+        else
+            retValue = "N";
+        return retValue;
+    }
+
+    public String getStatus() {
+        String retValue;
+        switch (Status) {
+            case 0:
+                retValue = "Захиалсан";
+                break;
+            case 1:
+                retValue = "Олгосон";
+                break;
+            case 2:
+                retValue = "Буцааж өгсөн";
+                break;
+            default:
+                retValue = "Захиалсан";
+                break;
+        }
+        return retValue;
+    }
+
+    public boolean getFavorites() {
+        return favorites;
+    }
+
+    public String getOrderDate() {
+        return OrderDate;
+    }
+
+    public String getGiveDate() {
+        return GiveDate;
+    }
+
+    public String getTakeDate() {
+        return this.TakeDate;
+    }
+
+    public String getReturnDate() {
+        return this.ReturnDate;
+    }
+
+    public String getReturnedDate() {
+        return this.ReturnedDate;
     }
 
     public void setBookID(long BookID) {
@@ -207,7 +264,42 @@ public class BookListDTL {
         this.BookImage = BookImage;
     }
 
-    public void setIsOrder(String isOrder) {
+    public void setIsOrder(long isOrder) {
         this.isOrder = isOrder;
+    }
+
+    public void setStatus(int Status) {
+        this.Status = Status;
+    }
+
+    public void setFavorites(String favorites) {
+        if (favorites.equals("Y"))
+            this.favorites = true;
+        else
+            this.favorites = false;
+    }
+
+    public void setFavorites(boolean favorites) {
+        this.favorites = favorites;
+    }
+
+    public void setGiveDate(String GiveDate) {
+        this.GiveDate = GiveDate;
+    }
+
+    public void setTakeDate(String TakeDate) {
+        this.TakeDate = TakeDate;
+    }
+
+    public void setReturnDate(String ReturnDate) {
+        this.ReturnDate = ReturnDate;
+    }
+
+    public void setReturnedDate(String ReturnedDate) {
+        this.ReturnedDate = ReturnedDate;
+    }
+
+    public void setOrderDate(String OrderDate) {
+        this.OrderDate = OrderDate;
     }
 }

@@ -28,16 +28,13 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <Spinner
-            android:id="@+id/txtOrderListType"
-            android:layout_width="match_parent"
-            android:layout_height="35dp" />
+
 
         <ListView
             android:id="@+id/order_list_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_weight="1" />
+            />
 
     </LinearLayout>
 

@@ -20,6 +20,7 @@ import android.widget.Spinner;
 
 import org.ksoap2.SoapEnvelope;
 import org.ksoap2.serialization.SoapObject;
+import org.ksoap2.serialization.SoapPrimitive;
 import org.ksoap2.serialization.SoapSerializationEnvelope;
 import org.ksoap2.transport.HttpTransportSE;
 import org.xmlpull.v1.XmlPullParserException;
@@ -60,10 +61,10 @@ public class OrderActivity extends Fragment {
     @Override
     public void onViewCreated(View view, Bundle savedInstanceState) {
 
-        getCategoryLocal();
-        adapterCategory = new ArrayAdapter<String>(thiscontext, android.R.layout.simple_spinner_item, categoryNames);
-        txtCategory = (Spinner) view.findViewById(R.id.txtOrderType);
-        txtCategory.setAdapter(adapterCategory);
+        //getCategoryLocal();
+        //adapterCategory = new ArrayAdapter<String>(thiscontext, android.R.layout.simple_spinner_item, categoryNames);
+        //txtCategory = (Spinner) view.findViewById(R.id.txtOrderType);
+        //txtCategory.setAdapter(adapterCategory);
 
         getBookListDTLs();
         bookListDTLAdapter = new OrderDTLAdapter(thiscontext, R.layout.order_dtl, bookListDTLs, this);
@@ -199,12 +200,14 @@ public class OrderActivity extends Fragment {
                 "       tblBook.Ipaddress,\n" +
                 "       tblBook.Macaddress,\n" +
                 "       BOOKIMAGE,\n" +
-                "       case when TBLBOOKORDER.bookid is not null then 'Y' else 'N' end as isorder" +
+                "       ifnull(TBLBOOKORDER.bookid,0) as isorder,\n" +
+                "       tblBook.favorites\n" +
                 "  FROM tblBook\n" +
                 "  left join tblCategory\n" +
                 "    on tblCategory.CategoryID = tblBook.CategoryID" +
                 " inner join (select DISTINCT bookid from TBLBOOKORDER where status = 0) TBLBOOKORDER " +
-                "    on TBLBOOKORDER.bookid = tblbook.bookid", null);
+                "    on TBLBOOKORDER.bookid = tblbook.bookid" +
+                " where tblbook.favorites = 'Y'", null);
         if (c.getCount() == 0) {
             return;
         }
@@ -230,9 +233,42 @@ public class OrderActivity extends Fragment {
                     c.getString(14),
                     c.getString(15),
                     tempImage,
-                    c.getString(17));
+                    c.getLong(17));
+            cn.setFavorites(c.getString(18));
             bookListDTLs.add(cn);
         }
+    }
+
+    public void setChangeFavorites(String bookID, boolean iffavorites) {
+        if (iffavorites)
+            db.execSQL("UPDATE TBLBOOK SET favorites = 'Y' WHERE BOOKID = " + bookID + "");
+        else
+            db.execSQL("UPDATE TBLBOOK SET favorites = 'N' WHERE BOOKID = " + bookID + "");
+    }
+
+    public String setBookOrder(String bookID, boolean isOrder) {
+
+        final String METHOD_NAME = "setBookOrder";
+        String mErrorMessage;
+        SoapObject request = new SoapObject(FragmentActivity.NAMESPACE, METHOD_NAME);
+        request.addProperty("userID", FragmentActivity._loginUserID);
+        request.addProperty("bookID", bookID);
+        request.addProperty("isOrder", isOrder);
+
+        SoapSerializationEnvelope envelope = new SoapSerializationEnvelope(SoapEnvelope.VER11);
+        envelope.dotNet = true;
+        envelope.setOutputSoapObject(request);
+        HttpTransportSE transporte = new HttpTransportSE(FragmentActivity.URL);
+        try {
+            transporte.call(FragmentActivity.NAMESPACE + METHOD_NAME, envelope);
+            SoapPrimitive resultado_xml = (SoapPrimitive) envelope.getResponse();
+            String res = resultado_xml.toString();
+            mErrorMessage = res;
+
+        } catch (Exception e) {
+            mErrorMessage = e.getMessage();
+        }
+        return mErrorMessage;
     }
 
     private void GetBook(String lastMaxID, String lastMotifyDate) {

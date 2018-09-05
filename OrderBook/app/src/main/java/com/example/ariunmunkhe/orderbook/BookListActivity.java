@@ -14,9 +14,12 @@ import android.util.Base64;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.SearchView;
 import android.widget.Spinner;
+import android.widget.Toast;
 
 import org.ksoap2.SoapEnvelope;
 import org.ksoap2.serialization.SoapObject;
@@ -46,8 +49,10 @@ public class BookListActivity  extends Fragment {
 
     Spinner txtCategory;
     ListView bookListView;
+    SearchView txtSearch;
     Context thiscontext;
-
+    boolean isFirst=true;
+    String SearchText="";
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup parent, Bundle savedInstanceState) {
         // Defines the xml file for the fragment
@@ -62,15 +67,65 @@ public class BookListActivity  extends Fragment {
     @Override
     public void onViewCreated(View view, Bundle savedInstanceState) {
 
+        txtSearch = (SearchView) view.findViewById(R.id.txtSearch);
+
+        // perform set on query text listener event
+        txtSearch.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+
+                getBookListDTLs(categoryIDs.get(txtCategory.getSelectedItemPosition()), query);
+                bookListDTLAdapter.notifyDataSetChanged();
+
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                // do something when text changes
+                if(newText.isEmpty() && SearchText != newText)
+                {
+                    getBookListDTLs(categoryIDs.get(txtCategory.getSelectedItemPosition()), "");
+                    bookListDTLAdapter.notifyDataSetChanged();
+                }
+                SearchText = newText;
+                return false;
+            }
+        });
+
+        getBookListDTLs("-1","");
+        bookListDTLAdapter = new BookListDTLAdapter(thiscontext, R.layout.book_dtl, bookListDTLs, this);
+        bookListView = (ListView) view.findViewById(R.id.book_list_view);
+        bookListView.setAdapter(bookListDTLAdapter);
+
+
         getCategoryLocal();
         adapterCategory = new ArrayAdapter<String>(thiscontext, android.R.layout.simple_spinner_item, categoryNames);
         txtCategory = (Spinner) view.findViewById(R.id.txtBookListType);
         txtCategory.setAdapter(adapterCategory);
 
-        getBookListDTLs();
-        bookListDTLAdapter = new BookListDTLAdapter(thiscontext, R.layout.book_dtl, bookListDTLs, this);
-        bookListView = (ListView) view.findViewById(R.id.book_list_view);
-        bookListView.setAdapter(bookListDTLAdapter);
+        txtCategory.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+
+            @Override
+            public void onItemSelected(AdapterView<?> arg0, View arg1,
+                                       int arg2, long arg3) {
+                // TODO Auto-generated method stub
+
+                String categoryID = categoryIDs.get(txtCategory.getSelectedItemPosition());
+                if(!isFirst) {
+                    getBookListDTLs(categoryID, SearchText);
+                    bookListDTLAdapter.notifyDataSetChanged();
+                }
+                isFirst = false;
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> arg0) {
+                // TODO Auto-generated method stub
+
+            }
+        });
+
     }
 
     private void getCategoryLocal() {
@@ -157,10 +212,22 @@ public class BookListActivity  extends Fragment {
 
     }
 
-    private void getBookListDTLs() {
+    private void getBookListDTLs(String CategoryID, String SearchText) {
 
+        String WhereStr = "";
         String lastMaxID = "";
         String lastMotifyDate = "";
+        if (!CategoryID.equals("-1")) {
+            WhereStr = " where tblBook.CategoryID = " + CategoryID;
+        }
+        if (!SearchText.isEmpty()) {
+            WhereStr += WhereStr.isEmpty() ? " where TBLBOOK.PRINTEDYEAR like '%"+SearchText+"%' or TBLBOOK.NAME like '%"+SearchText+"%' or TBLCATEGORY.NAME like '%"+SearchText+"%'" : " and (TBLBOOK.PRINTEDYEAR like '%"+SearchText+"%' or TBLBOOK.NAME like '%"+SearchText+"%' or TBLCATEGORY.NAME like '%"+SearchText+"%')";
+        }
+        db.execSQL("DELETE FROM TBLBOOKORDER");
+
+
+        GetBookOrder(lastMotifyDate);
+
         Cursor c = db.rawQuery("SELECT ifnull(max(BookID),-1) as lastMaxID, max(updated) as lastMotifyDate FROM tblBook", null);
         if (c.getCount() == 0) {
             lastMaxID = "-1";
@@ -172,7 +239,7 @@ public class BookListActivity  extends Fragment {
         }
         GetBook(lastMaxID, lastMotifyDate);
 
-        bookListDTLs = new ArrayList<BookListDTL>();
+        bookListDTLs.clear();
         BookListDTL cn;
         c = db.rawQuery("SELECT tblBook.Bookid,\n" +
                 "       tblBook.Code,\n" +
@@ -191,12 +258,13 @@ public class BookListActivity  extends Fragment {
                 "       tblBook.Ipaddress,\n" +
                 "       tblBook.Macaddress,\n" +
                 "       BOOKIMAGE,\n" +
-                "       case when TBLBOOKORDER.bookid is not null then 'Y' else 'N' end as isorder" +
+                "       ifnull(TBLBOOKORDER.bookid,0) as isorder,\n" +
+                "       tblBook.favorites\n" +
                 "  FROM tblBook\n" +
                 "  left join tblCategory\n" +
                 "    on tblCategory.CategoryID = tblBook.CategoryID" +
                 "  left join (select DISTINCT bookid from TBLBOOKORDER where status = 0) TBLBOOKORDER " +
-                "    on TBLBOOKORDER.bookid = tblbook.bookid", null);
+                "    on TBLBOOKORDER.bookid = tblbook.bookid "+WhereStr, null);
         if (c.getCount() == 0) {
             return;
         }
@@ -222,7 +290,8 @@ public class BookListActivity  extends Fragment {
                     c.getString(14),
                     c.getString(15),
                     tempImage,
-                    c.getString(17));
+                    c.getLong(17));
+            cn.setFavorites(c.getString(18));
             bookListDTLs.add(cn);
         }
     }
@@ -294,6 +363,81 @@ public class BookListActivity  extends Fragment {
         }
     }
 
+    private void GetBookOrder(String lastMotifyDate) {
+        try {
+            final String METHOD_NAME = "GetBookOrder";
+
+            SoapObject request = new SoapObject(FragmentActivity.NAMESPACE, METHOD_NAME);
+            //request.addProperty("lastMaxID", lastMaxID);
+            request.addProperty("lastMotifyDate", lastMotifyDate);
+            SoapSerializationEnvelope envelope = new SoapSerializationEnvelope(SoapEnvelope.VER11);
+            envelope.dotNet = true;
+            envelope.setOutputSoapObject(request);
+            HttpTransportSE transporte = new HttpTransportSE(FragmentActivity.URL);
+            transporte.call(FragmentActivity.NAMESPACE + METHOD_NAME, envelope);
+            SoapObject response = (SoapObject) envelope.getResponse();
+            SoapObject diffgram = (SoapObject) response.getProperty("diffgram");
+            SoapObject newdataset = (SoapObject) diffgram.getProperty("NewDataSet");
+
+            for (int i = 0; i < newdataset.getPropertyCount(); i++) {
+                SoapObject dataxml = (SoapObject) newdataset.getProperty(i);
+                try {
+                    //db.execSQL("delete FROM TBLBOOKORDER WHERE ORDERID='" + dataxml.getProperty(0).toString() + "'");
+                    ContentValues value = new ContentValues();
+                    if (dataxml.hasProperty("ORDERID"))
+                        value.put("ORDERID", dataxml.getProperty("ORDERID").toString());
+                    if (dataxml.hasProperty("STUDENTID"))
+                        value.put("STUDENTID", dataxml.getProperty("STUDENTID").toString());
+                    if (dataxml.hasProperty("BOOKID"))
+                        value.put("BOOKID", dataxml.getProperty("BOOKID").toString());
+                    if (dataxml.hasProperty("ORDERDATE"))
+                        value.put("ORDERDATE", dataxml.getProperty("ORDERDATE").toString());
+                    if (dataxml.hasProperty("GIVEDATE"))
+                        value.put("GIVEDATE", dataxml.getProperty("GIVEDATE").toString());
+                    if (dataxml.hasProperty("TAKEDATE"))
+                        value.put("TAKEDATE", dataxml.getProperty("TAKEDATE").toString());
+                    if (dataxml.hasProperty("RETURNDATE"))
+                        value.put("RETURNDATE", dataxml.getProperty("RETURNDATE").toString());
+                    if (dataxml.hasProperty("RETURNEDDATE"))
+                        value.put("RETURNEDDATE", dataxml.getProperty("RETURNEDDATE").toString());
+                    if (dataxml.hasProperty("STATUS"))
+                        value.put("STATUS", dataxml.getProperty("STATUS").toString());
+                    if (dataxml.hasProperty("REASON"))
+                        value.put("REASON", dataxml.getProperty("REASON").toString());
+                    if (dataxml.hasProperty("NOTE"))
+                        value.put("NOTE", dataxml.getProperty("NOTE").toString());
+                    if (dataxml.hasProperty("CREATED"))
+                        value.put("CREATED", dataxml.getProperty("CREATED").toString());
+                    if (dataxml.hasProperty("CREATEDBY"))
+                        value.put("CREATEDBY", dataxml.getProperty("CREATEDBY").toString());
+                    if (dataxml.hasProperty("UPDATED"))
+                        value.put("UPDATED", dataxml.getProperty("UPDATED").toString());
+                    if (dataxml.hasProperty("IPADDRESS"))
+                        value.put("IPADDRESS", dataxml.getProperty("IPADDRESS").toString());
+                    if (dataxml.hasProperty("MACADDRESS"))
+                        value.put("MACADDRESS", dataxml.getProperty("MACADDRESS").toString());
+
+                    db.insert("TBLBOOKORDER", null, value);
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (XmlPullParserException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void setChangeFavorites(String bookID, boolean iffavorites) {
+        if (iffavorites)
+            db.execSQL("UPDATE TBLBOOK SET favorites = 'Y' WHERE BOOKID = " + bookID + "");
+        else
+            db.execSQL("UPDATE TBLBOOK SET favorites = 'N' WHERE BOOKID = " + bookID + "");
+    }
+
     public String setBookOrder(String bookID, boolean isOrder) {
 
         final String METHOD_NAME = "setBookOrder";
@@ -318,5 +462,4 @@ public class BookListActivity  extends Fragment {
         }
         return mErrorMessage;
     }
-
 }

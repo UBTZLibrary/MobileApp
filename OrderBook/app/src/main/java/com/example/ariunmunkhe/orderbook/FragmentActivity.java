@@ -123,6 +123,7 @@ public class FragmentActivity extends AppCompatActivity
                     "ISBN NVARCHAR2(40) Null ,\n" +
                     "CATEGORYID NUMBER(10) Null ,\n" +
                     "ISACTIVE NVARCHAR2(1) DEFAULT 'Y',\n" +
+                    "favorites NVARCHAR2(1) DEFAULT 'N',\n"+
                     "PRINTEDYEAR NVARCHAR2(4) Null ,\n" +
                     "PRINTEDVERSION NUMBER(3) DEFAULT 1,\n" +
                     "VOLUMENUM NUMBER(3) DEFAULT 0,\n" +

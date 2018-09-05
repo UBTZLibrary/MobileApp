@@ -14,9 +14,12 @@ import android.util.Base64;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.Spinner;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import org.ksoap2.SoapEnvelope;
 import org.ksoap2.serialization.SoapObject;
@@ -36,7 +39,7 @@ import static com.example.ariunmunkhe.orderbook.FragmentActivity.db;
 
 public class OrderHistListActivity  extends Fragment {
 
-    ArrayList<OrderHistListDTL> bookListDTLs = new ArrayList<OrderHistListDTL>();
+    ArrayList<BookListDTL> bookListDTLs = new ArrayList<BookListDTL>();
     OrderHistListDTLAdapter bookListDTLAdapter;
 
     ArrayList<String> categoryNames;
@@ -61,15 +64,17 @@ public class OrderHistListActivity  extends Fragment {
     @Override
     public void onViewCreated(View view, Bundle savedInstanceState) {
 
-        getCategoryLocal();
-        adapterCategory = new ArrayAdapter<String>(thiscontext, android.R.layout.simple_spinner_item, categoryNames);
-        txtCategory = (Spinner) view.findViewById(R.id.txtOrderListType);
-        txtCategory.setAdapter(adapterCategory);
+        //getCategoryLocal();
+        //adapterCategory = new ArrayAdapter<String>(thiscontext, android.R.layout.simple_spinner_item, categoryNames);
+        //txtCategory = (Spinner) view.findViewById(R.id.txtOrderListType);
+        //txtCategory.setAdapter(adapterCategory);
 
         getBookListDTLs();
         bookListDTLAdapter = new OrderHistListDTLAdapter(thiscontext, R.layout.order_hist_dtl, bookListDTLs, this);
         bookListView = (ListView) view.findViewById(R.id.order_list_view);
         bookListView.setAdapter(bookListDTLAdapter);
+
+
     }
 
     private void getCategoryLocal() {
@@ -160,20 +165,20 @@ public class OrderHistListActivity  extends Fragment {
 
         String lastMaxID = "";
         String lastMotifyDate = "";
-        Cursor c = db.rawQuery("SELECT ifnull(max(BookID),-1) as lastMaxID, max(updated) as lastMotifyDate FROM tblBook", null);
-        if (c.getCount() == 0) {
-            lastMaxID = "-1";
-            lastMotifyDate = "";
-        }
-        while (c.moveToNext()) {
-            lastMaxID = c.getString(0);
-            lastMotifyDate = c.getString(1);
-        }
-        GetBook(lastMaxID, lastMotifyDate);
+        db.execSQL("delete FROM TBLBOOKORDER");
+        //if (c.getCount() == 0) {
+        //   lastMaxID = "-1";
+        //   lastMotifyDate = "";
+        //}
+        //while (c.moveToNext()) {
+        //    lastMaxID = c.getString(0);
+        //    lastMotifyDate = c.getString(1);
+        //}
+        GetBook(lastMotifyDate);
 
-        bookListDTLs = new ArrayList<OrderHistListDTL>();
-        OrderHistListDTL cn;
-        c = db.rawQuery("SELECT tblBook.Bookid,\n" +
+        bookListDTLs = new ArrayList<BookListDTL>();
+        BookListDTL cn;
+        Cursor c = db.rawQuery("SELECT tblBook.Bookid,\n" +
                 "       tblBook.Code,\n" +
                 "       tblBook.Name,\n" +
                 "       tblBook.Isbn,\n" +
@@ -190,12 +195,18 @@ public class OrderHistListActivity  extends Fragment {
                 "       tblBook.Ipaddress,\n" +
                 "       tblBook.Macaddress,\n" +
                 "       BOOKIMAGE,\n" +
-                "       case when TBLBOOKORDER.bookid is not null then 'Y' else 'N' end as isorder" +
-                "  FROM tblBook\n" +
+                "       TBLBOOKORDER.status,\n" +
+                "       tblBook.favorites,\n" +
+                "       strftime('%Y.%m.%d',TBLBOOKORDER.OrderDate),\n" +
+                "       strftime('%Y.%m.%d',TBLBOOKORDER.GiveDate),\n" +
+                "       strftime('%Y.%m.%d',TBLBOOKORDER.TakeDate),\n" +
+                "       strftime('%Y.%m.%d',TBLBOOKORDER.ReturnDate),\n" +
+                "       strftime('%Y.%m.%d',TBLBOOKORDER.ReturnedDate)\n" +
+                "  FROM TBLBOOKORDER \n" +
+                "  left join tblBook " +
+                "    on TBLBOOKORDER.bookid = tblbook.bookid" +
                 "  left join tblCategory\n" +
-                "    on tblCategory.CategoryID = tblBook.CategoryID" +
-                "  left join (select DISTINCT bookid from TBLBOOKORDER where status = 0) TBLBOOKORDER " +
-                "    on TBLBOOKORDER.bookid = tblbook.bookid", null);
+                "    on tblCategory.CategoryID = tblBook.CategoryID", null);
         if (c.getCount() == 0) {
             return;
         }
@@ -204,17 +215,48 @@ public class OrderHistListActivity  extends Fragment {
             byte[] zurag = c.getBlob(16);
             if (zurag != null)
                 tempImage = BitmapFactory.decodeByteArray(zurag, 0, zurag.length);
-            cn = new OrderHistListDTL();
+            cn = new BookListDTL(c.getLong(0),
+                    c.getString(1),
+                    c.getString(2),
+                    c.getString(3),
+                    c.getString(4),
+                    c.getString(5),
+                    c.getString(6),
+                    c.getLong(7),
+                    c.getLong(8),
+                    c.getLong(9),
+                    c.getString(10),
+                    c.getString(11),
+                    c.getString(12),
+                    c.getString(13),
+                    c.getString(14),
+                    c.getString(15),
+                    tempImage,
+                    c.getLong(17));
+            cn.setStatus(c.getInt(17));
+            cn.setFavorites(c.getString(18));
+            cn.setOrderDate(c.getString(19));
+            cn.setGiveDate(c.getString(20));
+            cn.setTakeDate(c.getString(21));
+            cn.setReturnDate(c.getString(22));
+            cn.setReturnedDate(c.getString(23));
             bookListDTLs.add(cn);
         }
     }
 
-    private void GetBook(String lastMaxID, String lastMotifyDate) {
+    public void setChangeFavorites(String bookID, boolean iffavorites) {
+        if (iffavorites)
+            db.execSQL("UPDATE TBLBOOK SET favorites = 'Y' WHERE BOOKID = " + bookID + "");
+        else
+            db.execSQL("UPDATE TBLBOOK SET favorites = 'N' WHERE BOOKID = " + bookID + "");
+    }
+
+    private void GetBook(String lastMotifyDate) {
         try {
-            final String METHOD_NAME = "GetBook";
+            final String METHOD_NAME = "GetBookOrder";
 
             SoapObject request = new SoapObject(FragmentActivity.NAMESPACE, METHOD_NAME);
-            request.addProperty("lastMaxID", lastMaxID);
+            //request.addProperty("lastMaxID", lastMaxID);
             request.addProperty("lastMotifyDate", lastMotifyDate);
             SoapSerializationEnvelope envelope = new SoapSerializationEnvelope(SoapEnvelope.VER11);
             envelope.dotNet = true;
@@ -228,41 +270,42 @@ public class OrderHistListActivity  extends Fragment {
             for (int i = 0; i < newdataset.getPropertyCount(); i++) {
                 SoapObject dataxml = (SoapObject) newdataset.getProperty(i);
                 try {
-                    db.execSQL("delete FROM tblBook WHERE BookID='" + dataxml.getProperty(0).toString() + "'");
+                    db.execSQL("delete FROM TBLBOOKORDER WHERE ORDERID='" + dataxml.getProperty(0).toString() + "'");
                     ContentValues value = new ContentValues();
+                    if (dataxml.hasProperty("ORDERID"))
+                        value.put("ORDERID", dataxml.getProperty("ORDERID").toString());
+                    if (dataxml.hasProperty("STUDENTID"))
+                        value.put("STUDENTID", dataxml.getProperty("STUDENTID").toString());
                     if (dataxml.hasProperty("BOOKID"))
-                        value.put("BookID", dataxml.getProperty("BOOKID").toString());
-                    if (dataxml.hasProperty("CODE"))
-                        value.put("Code", dataxml.getProperty("CODE").toString());
-                    if (dataxml.hasProperty("NAME"))
-                        value.put("Name", dataxml.getProperty("NAME").toString());
-                    if (dataxml.hasProperty("ISBN"))
-                        value.put("ISBN", dataxml.getProperty("ISBN").toString());
-                    if (dataxml.hasProperty("CATEGORYID"))
-                        value.put("CategoryID", dataxml.getProperty("CATEGORYID").toString());
-                    if (dataxml.hasProperty("ISACTIVE"))
-                        value.put("IsActive", dataxml.getProperty("ISACTIVE").toString());
-                    if (dataxml.hasProperty("PRINTEDYEAR"))
-                        value.put("PrintedYear", dataxml.getProperty("PRINTEDYEAR").toString());
-                    if (dataxml.hasProperty("PRINTEDVERSION"))
-                        value.put("PrintedVersion", dataxml.getProperty("PRINTEDVERSION").toString());
-                    if (dataxml.hasProperty("VOLUMENUM"))
-                        value.put("VolumeNum", dataxml.getProperty("VOLUMENUM").toString());
-                    if (dataxml.hasProperty("TOTALVOLUMENUM"))
-                        value.put("TotalVolumeNum", dataxml.getProperty("TOTALVOLUMENUM").toString());
+                        value.put("BOOKID", dataxml.getProperty("BOOKID").toString());
+                    if (dataxml.hasProperty("ORDERDATE"))
+                        value.put("ORDERDATE", dataxml.getProperty("ORDERDATE").toString());
+                    if (dataxml.hasProperty("GIVEDATE"))
+                        value.put("GIVEDATE", dataxml.getProperty("GIVEDATE").toString());
+                    if (dataxml.hasProperty("TAKEDATE"))
+                        value.put("TAKEDATE", dataxml.getProperty("TAKEDATE").toString());
+                    if (dataxml.hasProperty("RETURNDATE"))
+                        value.put("RETURNDATE", dataxml.getProperty("RETURNDATE").toString());
+                    if (dataxml.hasProperty("RETURNEDDATE"))
+                        value.put("RETURNEDDATE", dataxml.getProperty("RETURNEDDATE").toString());
+                    if (dataxml.hasProperty("STATUS"))
+                        value.put("STATUS", dataxml.getProperty("STATUS").toString());
+                    if (dataxml.hasProperty("REASON"))
+                        value.put("REASON", dataxml.getProperty("REASON").toString());
+                    if (dataxml.hasProperty("NOTE"))
+                        value.put("NOTE", dataxml.getProperty("NOTE").toString());
                     if (dataxml.hasProperty("CREATED"))
-                        value.put("Created", dataxml.getProperty("CREATED").toString());
+                        value.put("CREATED", dataxml.getProperty("CREATED").toString());
                     if (dataxml.hasProperty("CREATEDBY"))
-                        value.put("CreatedBy", dataxml.getProperty("CREATEDBY").toString());
+                        value.put("CREATEDBY", dataxml.getProperty("CREATEDBY").toString());
                     if (dataxml.hasProperty("UPDATED"))
-                        value.put("Updated", dataxml.getProperty("UPDATED").toString());
-                    if (dataxml.hasProperty("UPDATEDBY"))
-                        value.put("UpdatedBy", dataxml.getProperty("UPDATEDBY").toString());
-                    if (dataxml.hasProperty("PICTUREDATA")) {
-                        byte[] newByte = Base64.decode(dataxml.getProperty("PICTUREDATA").toString(), Base64.DEFAULT);
-                        value.put("BOOKIMAGE", newByte);
-                    }
-                    db.insert("tblBook", null, value);
+                        value.put("UPDATED", dataxml.getProperty("UPDATED").toString());
+                    if (dataxml.hasProperty("IPADDRESS"))
+                        value.put("IPADDRESS", dataxml.getProperty("IPADDRESS").toString());
+                    if (dataxml.hasProperty("MACADDRESS"))
+                        value.put("MACADDRESS", dataxml.getProperty("MACADDRESS").toString());
+
+                    db.insert("TBLBOOKORDER", null, value);
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
