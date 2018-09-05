@@ -103,7 +103,6 @@ public class BookListActivity  extends Fragment {
         adapterCategory = new ArrayAdapter<String>(thiscontext, android.R.layout.simple_spinner_item, categoryNames);
         txtCategory = (Spinner) view.findViewById(R.id.txtBookListType);
         txtCategory.setAdapter(adapterCategory);
-
         txtCategory.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 
             @Override

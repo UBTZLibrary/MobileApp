@@ -158,19 +158,11 @@ public class OrderActivity extends Fragment {
 
     private void getBookListDTLs() {
 
-        String lastMotifyDate = "";
-        Cursor c = db.rawQuery("SELECT max(updated) as lastMotifyDate FROM tblBookOrder", null);
-        if (c.getCount() == 0) {
-            lastMotifyDate = "";
-        }
-        while (c.moveToNext()) {
-            lastMotifyDate = c.getString(0);
-        }
-        GetBookOrder(lastMotifyDate);
+        GetBookOrder("");
         String lastMaxID = "";
-        lastMotifyDate = "";
+        String lastMotifyDate = "";
 
-        c = db.rawQuery("SELECT ifnull(max(BookID),-1) as lastMaxID, max(updated) as lastMotifyDate FROM tblBook", null);
+        Cursor  c = db.rawQuery("SELECT ifnull(max(BookID),-1) as lastMaxID, max(updated) as lastMotifyDate FROM tblBook", null);
         if (c.getCount() == 0) {
             lastMaxID = "-1";
             lastMotifyDate = "";
@@ -205,7 +197,7 @@ public class OrderActivity extends Fragment {
                 "  FROM tblBook\n" +
                 "  left join tblCategory\n" +
                 "    on tblCategory.CategoryID = tblBook.CategoryID" +
-                " inner join (select DISTINCT bookid from TBLBOOKORDER where status = 0) TBLBOOKORDER " +
+                "  left join (select DISTINCT bookid from TBLBOOKORDER where status = 0) TBLBOOKORDER " +
                 "    on TBLBOOKORDER.bookid = tblbook.bookid" +
                 " where tblbook.favorites = 'Y'", null);
         if (c.getCount() == 0) {
